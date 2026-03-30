@@ -32,8 +32,28 @@ def get_transforms() -> v2.Transform:
     )
 
 
-def get_dataset(path: Path, transforms: nn.Module | None = None) -> Dataset:
-    return ImageFolder(path, loader=pil_loader_safe, transform=transforms)
+def get_dataset(path: Path, transforms=None):
+    all_images = []
+    classes = sorted([d.name for d in path.iterdir() if d.is_dir()])
+    class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+
+    for cls in classes:
+        cls_dir = path / cls
+        for img_path in cls_dir.iterdir():
+            if img_path.suffix.lower() not in [".jpg", ".jpeg", ".png"]:
+                continue
+            try:
+                with Image.open(img_path) as img:
+                    img.verify()
+                all_images.append((str(img_path), class_to_idx[cls]))
+            except Exception:
+                print(f"Skipping corrupted image: {img_path}")
+
+    dataset = ImageFolder(path, transform=transforms)
+    dataset.samples = all_images
+    dataset.targets = [t for _, t in all_images]
+    dataset.imgs = dataset.samples
+    return dataset
 
 
 def get_dataloader(
