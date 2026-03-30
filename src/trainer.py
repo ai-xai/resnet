@@ -6,10 +6,20 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import v2
 from tqdm import tqdm
+
+
+def pil_loader_safe(path):
+    try:
+        with Image.open(path) as img:
+            return img.convert("RGB")
+    except OSError:
+        print(f"Skipping corrupted image: {path}")
+        return None
 
 
 def get_transforms() -> v2.Transform:
@@ -23,7 +33,7 @@ def get_transforms() -> v2.Transform:
 
 
 def get_dataset(path: Path, transforms: nn.Module | None = None) -> Dataset:
-    return ImageFolder(path, transform=transforms)
+    return ImageFolder(path, loader=pil_loader_safe, transform=transforms)
 
 
 def get_dataloader(
