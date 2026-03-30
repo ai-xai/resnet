@@ -1,3 +1,6 @@
+import logging
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 
@@ -215,3 +218,21 @@ class ResNet(nn.Module):
         x = self.fc(x)
 
         return x
+
+    def load(self, path: Path, device: torch.device | str = "cpu") -> None:
+        """
+        Loads model weights from a checkpoint file and sets the model to evaluation mode.
+
+        Args:
+            path: Path to the checkpoint file containing model weights.
+            device: Device on which to load the model (e.g., 'cpu' or 'cuda').
+
+        Returns:
+            None
+        """
+        data = torch.load(path, map_location=device)
+
+        self.load_state_dict(data["weights"])
+        self.eval()
+
+        logging.info(f"Successfully loaded weights and config from {path}")
