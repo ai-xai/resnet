@@ -43,12 +43,18 @@ def get_dataloader(
     num_workers: int = 0,
     pin_memory: bool = False,
 ) -> DataLoader:
+
+    def collate_skip_none(batch):
+        batch = [b for b in batch if b is not None]
+        return torch.utils.data.dataloader.default_collate(batch)
+
     return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        collate_fn=collate_skip_none,
     )
 
 
