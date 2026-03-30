@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class BasicBlock(nn.Module):
@@ -218,6 +219,22 @@ class ResNet(nn.Module):
         x = self.fc(x)
 
         return x
+
+    def predict(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Performs inference on the input tensor and returns class probabilities.
+
+        This method sets the model to evaluation mode and disables gradient computation.
+
+        Args:
+            x: Input tensor of shape (batch_size, channels, height, width) compatible with the model.
+
+        Returns:
+            torch.Tensor: Tensor of shape (batch_size, num_classes) containing predicted class probabilities.
+        """
+        self.eval()
+        with torch.no_grad():
+            return F.softmax(self(x), dim=-1)
 
     def load(self, path: Path, device: torch.device | str = "cpu") -> None:
         """
