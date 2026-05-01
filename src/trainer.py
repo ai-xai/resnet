@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +10,10 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import v2
 from tqdm import tqdm
+
+from .logger import get_logger
+
+log = get_logger(__name__)
 
 
 def pil_loader_safe(path):
@@ -148,7 +151,7 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
-            logging.info(
+            log.info(
                 f"epoch: {epoch + 1} | loss: {total_loss / len(self._train_dataloader):.5f}"
             )
             loss_data["train"].append(total_loss / len(self._train_dataloader))
@@ -192,7 +195,7 @@ class Trainer:
                 total_samples += X.size(0)
 
         accuracy = total_correct / total_samples
-        logging.info(f"Accuracy: {accuracy:.4f}")
+        log.info(f"Accuracy: {accuracy:.4f}")
 
         avg_loss = total_loss / total_samples
         return avg_loss
@@ -242,7 +245,7 @@ class Trainer:
         data["weights"] = model.state_dict()  # type: ignore
 
         torch.save(data, path)
-        logging.info(f"Model state saved in: {path}")
+        log.info(f"Model state saved in: {path}")
 
     def _load_checkpoint(self, path: Path) -> None:
         """
@@ -258,7 +261,7 @@ class Trainer:
             None
         """
         if not path.exists():
-            logging.error(f"File not found: {path}")
+            log.error(f"File not found: {path}")
             return
 
         data = torch.load(path, map_location=self.device)
@@ -269,4 +272,4 @@ class Trainer:
         else:
             self.model.load_state_dict(data["weights"])
 
-        logging.info(f"Checkpoint: {path} successfully loaded")
+        log.info(f"Checkpoint: {path} successfully loaded")

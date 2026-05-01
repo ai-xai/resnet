@@ -1,9 +1,12 @@
-import logging
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from .logger import get_logger
+
+log = get_logger(__name__)
 
 
 class BasicBlock(nn.Module):
@@ -252,4 +255,4 @@ class ResNet(nn.Module):
         self.load_state_dict(data["weights"])
         self.eval()
 
-        logging.info(f"Successfully loaded weights and config from {path}")
+        log.info(f"Successfully loaded weights and config from {path}")
