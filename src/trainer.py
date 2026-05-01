@@ -32,10 +32,10 @@ def _collate_skip_none(batch):
     return default_collate(batch_filtered)
 
 
-def get_transforms() -> v2.Transform:
+def get_transforms(size: tuple[int, int] = (224, 224)) -> v2.Transform:
     return v2.Compose(
         [
-            v2.Resize((224, 224)),
+            v2.Resize(size),
             v2.PILToTensor(),
             v2.ToDtype(torch.float32, scale=True),
         ]
@@ -71,6 +71,7 @@ class Trainer:
         lr: float,
         train_dataloader: DataLoader,
         test_dataloader: DataLoader,
+        patience: int = 2,
     ) -> None:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self._train_dataloader = train_dataloader
@@ -84,6 +85,10 @@ class Trainer:
 
         self.optimizer = optim.SGD(
             self.model.parameters(), lr=lr, weight_decay=1e-3, momentum=0.9
+        )
+
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, mode="min", factor=0.5, patience=patience
         )
 
     def train(
@@ -134,12 +139,13 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
-            log.info(
-                f"epoch: {epoch + 1} | loss: {total_loss / len(self._train_dataloader):.5f}"
-            )
-            loss_data["train"].append(total_loss / len(self._train_dataloader))
+            avg_train_loss = total_loss / len(self._train_dataloader)
+            log.info(f"epoch: {epoch + 1} | loss: {avg_train_loss:.5f}")
+            loss_data["train"].append(avg_train_loss)
 
-            loss_data["test"].append(self._test_epoch())
+            avg_test_loss = self._test_epoch()
+            loss_data["test"].append(avg_test_loss)
+            self.scheduler.step(avg_test_loss)
 
             if (epoch + 1) % checkpoint_interval == 0 and (epoch + 1) != n_epochs:
                 filename = f"{datetime.now().strftime('%Y%m%d')}_{epoch + 1}_{final_model_path.stem}.pth"
@@ -178,9 +184,9 @@ class Trainer:
                 total_samples += X.size(0)
 
         accuracy = total_correct / total_samples
-        log.info(f"Accuracy: {accuracy:.4f}")
-
         avg_loss = total_loss / total_samples
+
+        log.info(f"Accuracy: {accuracy:.4f} | Loss: {avg_loss:.4f}")
         return avg_loss
 
     def _plot_loss(self, data: dict[str, list[float]]) -> None:
