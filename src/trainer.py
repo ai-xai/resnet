@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.dataloader import default_collate
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import v2
 from tqdm import tqdm
@@ -16,13 +17,19 @@ from .logger import get_logger
 log = get_logger(__name__)
 
 
-def pil_loader_safe(path):
+def _pil_loader_safe(path: Path | str) -> Image.Image | None:
     try:
-        with Image.open(path) as img:
+        with open(path, "rb") as f:
+            img = Image.open(f)
             return img.convert("RGB")
-    except OSError:
-        print(f"Skipping corrupted image: {path}")
+    except Exception as e:
+        log.warning(f"Skipping corrupted image {path!r}: {e}")
         return None
+
+
+def _collate_skip_none(batch):
+    batch_filtered = list(filter(lambda x: x[0] is not None, batch))
+    return default_collate(batch_filtered)
 
 
 def get_transforms() -> v2.Transform:
@@ -36,26 +43,7 @@ def get_transforms() -> v2.Transform:
 
 
 def get_dataset(path: Path, transforms=None):
-    all_images = []
-    classes = sorted([d.name for d in path.iterdir() if d.is_dir()])
-    class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
-
-    for cls in classes:
-        cls_dir = path / cls
-        for img_path in cls_dir.iterdir():
-            if img_path.suffix.lower() not in [".jpg", ".jpeg", ".png"]:
-                continue
-            try:
-                with Image.open(img_path) as img:
-                    img.verify()
-                all_images.append((str(img_path), class_to_idx[cls]))
-            except Exception:
-                print(f"Skipping corrupted image: {img_path}")
-
-    dataset = ImageFolder(path, transform=transforms)
-    dataset.samples = all_images
-    dataset.targets = [t for _, t in all_images]
-    dataset.imgs = dataset.samples
+    dataset = ImageFolder(path, transform=transforms, loader=_pil_loader_safe)
     return dataset
 
 
@@ -66,18 +54,13 @@ def get_dataloader(
     num_workers: int = 0,
     pin_memory: bool = False,
 ) -> DataLoader:
-
-    def collate_skip_none(batch):
-        batch = [b for b in batch if b is not None]
-        return torch.utils.data.dataloader.default_collate(batch)
-
     return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        collate_fn=collate_skip_none,
+        collate_fn=_collate_skip_none,
     )
 
 
