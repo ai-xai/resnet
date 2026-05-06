@@ -3,6 +3,8 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from .logger import get_logger
 
@@ -256,3 +258,38 @@ class ResNet(nn.Module):
         self.eval()
 
         log.info(f"Successfully loaded weights and config from {path}")
+
+    def get_gradcam(self, image: torch.Tensor, target: int | torch.Tensor) -> torch.Tensor:
+        """
+        Generates a Grad-CAM heatmap to visualize model focus for a specific class.
+
+        This method uses Gradient-weighted Class Activation Mapping (Grad-CAM)
+        targeting the last block of the fourth residual layer (``layer4``).
+        The resulting heatmap highlights the regions of the input image that
+        most influenced the model's prediction for the specified target.
+
+        Args:
+            image (torch.Tensor): Input image tensor of shape ``(3, H, W)``
+                or ``(1, 3, H, W)``.
+            target (int | torch.Tensor): The index of the target class to
+                explain. If a tensor is provided, it must be a single-value
+                tensor (scalar).
+
+        Returns:
+            torch.Tensor: A 2D grayscale heatmap of shape ``(H, W)`` with
+                values normalized between 0 and 1, representing the importance
+                of each pixel.
+        """
+        if image.dim() == 3:
+            image = image.unsqueeze(0)
+
+        target_layers = [self.layer4[-1]]
+
+        target_idx = target.item() if isinstance(target, torch.Tensor) else target
+
+        targets = [ClassifierOutputTarget(target_idx)]
+
+        with GradCAM(model=self, target_layers=target_layers) as cam:
+            grayscale_cam = cam(input_tensor=image, targets=targets)
+
+            return torch.from_numpy(grayscale_cam[0, :])
