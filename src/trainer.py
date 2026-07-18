@@ -35,6 +35,7 @@ def _collate_skip_none(batch):
 def get_transforms(size: tuple[int, int] = (224, 224)) -> v2.Transform:
     return v2.Compose(
         [
+            v2.Resize((1024, 1024)),
             v2.Resize(size),
             v2.PILToTensor(),
             v2.ToDtype(torch.float32, scale=True),
